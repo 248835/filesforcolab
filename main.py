@@ -4,7 +4,7 @@ from operator import itemgetter
 from fastpunct import FastPunct
 from tqdm import tqdm
 
-import gruen.Main as gruen
+import GRUEN.Main as gruen
 from keybert import KeyBERT
 from phonemizer import phonemize
 from phonemizer.separator import Separator
