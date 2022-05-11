@@ -51,6 +51,8 @@ def chunks(lst, n):
 
 
 if __name__ == '__main__':
+    join_csv()
+    
     with open('joined_haikus.csv', 'r') as csvfile:
         reader = csv.DictReader(csvfile)
         fieldnames = reader.fieldnames
