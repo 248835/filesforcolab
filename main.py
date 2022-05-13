@@ -1,5 +1,7 @@
 import csv
+import itertools
 from operator import itemgetter
+from pprint import pprint
 
 from fastpunct import FastPunct
 from tqdm import tqdm
@@ -64,34 +66,36 @@ def get_punct():
 
     fieldnames = [*fieldnames, 'punct0', 'punct1', 'punct2']
 
-    with open('punct_haikus.csv', 'w') as csvfile:
+    with open('punct_haikus1.csv', 'w') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
 
     fastpunct = FastPunct()
-    for chunk in tqdm(list(chunks(read_csv, 500))):
-        cleans = [itemgetter('clean0', 'clean1', 'clean2')(row) for row in chunk]
-        flat_cleans = [item for sublist in cleans for item in sublist]
+    for chunk in tqdm(list(chunks(read_csv[:10], 5))):
+        cleans_counts = [[element.count(' ') + 1 for element in itemgetter('clean0', 'clean1', 'clean2')(row)] for row in chunk]
+        cleans = [' '.join(itemgetter('clean0', 'clean1', 'clean2')(row)) for row in chunk]
 
-        punct = fastpunct.punct(flat_cleans)
+        punct = fastpunct.punct(cleans)
 
-        for row, puncts in zip(chunk, chunks(punct, 3)):
-            row['punct0'] = puncts[0]
-            row['punct1'] = puncts[1]
-            row['punct2'] = puncts[2]
+        for row, puncts, hmm_element in zip(chunk, punct, cleans_counts):
+            hmm_acc = list(itertools.accumulate(hmm_element, lambda x, y: x + y))
+            puncts_split = [' '.join(puncts.split()[start:end]) for start, end in zip([0, *hmm_acc], hmm_acc)]
+            row['punct0'] = puncts_split[0]
+            row['punct1'] = puncts_split[1]
+            row['punct2'] = puncts_split[2]
 
-        with open('punct_haikus.csv', 'a') as csvfile:
+        with open('punct_haikus1.csv', 'a') as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writerows(chunk)
 
 
 def get_keywords():
-    with open('punct_haikus.csv', 'r') as csvfile:
+    with open('punct_haikus1.csv', 'r') as csvfile:
         reader = csv.DictReader(csvfile)
         fieldnames = reader.fieldnames
         read_csv = list(reader)
 
-    punct = [itemgetter('clean0', 'clean1', 'clean2')(row) for row in read_csv]
+    punct = [itemgetter('punct0', 'punct1', 'punct2')(row) for row in read_csv]
     docs = [' '.join(row) for row in punct]
 
     kw_model = KeyBERT()
@@ -100,34 +104,39 @@ def get_keywords():
         row['keywords'] = keyword
     fieldnames = [*fieldnames, 'keywords']
 
-    with open('keyword_haikus.csv', 'w') as csvfile:
+    with open('keyword_haikus1.csv', 'w') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(read_csv)
 
 
 def get_gruen():
-    with open('keyword_haikus.csv', 'r') as csvfile:
+    with open('keyword_haikus1.csv', 'r') as csvfile:
         reader = csv.DictReader(csvfile)
         fieldnames = reader.fieldnames
         read_csv = list(reader)
-    punct = [itemgetter('punct0', 'punct1', 'punct2')(row) for row in read_csv]
-    docs = [' '.join(row) for row in punct]
-    for gruen_score, row in zip(GRUEN.get_gruen(docs), read_csv):
-        row['GRUEN'] = gruen_score
-    fieldnames = [*fieldnames, 'GRUEN']
-    with open('processed_haikus.csv', 'w') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
+    fieldnames = [*fieldnames, 'GRUEN']
+    with open('processed_haikus1.csv', 'w') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows(read_csv)
+
+    for chunk in chunks(read_csv, 10_000):
+        punct = [itemgetter('punct0', 'punct1', 'punct2')(row) for row in chunk]
+        docs = [' '.join(row) for row in punct]
+        for gruen_score, row in zip(GRUEN.get_gruen(docs), chunk):
+            row['GRUEN'] = gruen_score
+
+        with open('processed_haikus1.csv', 'a') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writerows(chunk)
 
 
 if __name__ == '__main__':
     # join_csv()
 
-    # get_punct()
+    get_punct()
 
-    # get_keywords()
+    get_keywords()
 
     get_gruen()
